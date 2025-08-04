@@ -3,7 +3,7 @@ from .config import GITHUB_REPO
 
 def parse_and_comment(repo, pr_number, path, fab_text, head_sha):
     if "No rule violations found." in fab_text:
-        print(f"  ✅ No violations in {path}")
+        print(f" No violations in {path}")
         return
 
     lines = fab_text.split('\n')
@@ -36,11 +36,11 @@ def review_pr(pr):
     pr_title = pr['title']
     head_sha = pr['head']['sha']
 
-    print(f"\n🔍 Reviewing PR #{pr_number}: {pr_title}")
+    print(f"\n Reviewing PR #{pr_number}: {pr_title}")
     for file in github.get_pr_files(GITHUB_REPO, pr_number):
         if file['status'] in ['added', 'modified']:
             path = file['filename']
-            print(f"  📄 Reviewing {path}...")
+            print(f"  Reviewing {path}...")
             content = github.get_file_content(GITHUB_REPO, path, head_sha)
             if content:
                 fab_text = fab.send_to_fab(path, content)
