@@ -1,30 +1,25 @@
-
 import requests
 import base64
-from .config import GITHUB_PAT
 
-headers = {
-    "Authorization": f"Bearer {GITHUB_PAT}",
-    "Accept": "application/vnd.github+json"
-}
-
-def get_open_prs(repo):
-    url = f"https://api.github.com/repos/{repo}/pulls?state=open"
-    return requests.get(url, headers=headers).json()
-
-def get_pr_files(repo, pr_number):
+def get_pr_files(repo, pr_number, token):
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files"
-    return requests.get(url, headers=headers).json()
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
 
-def get_file_content(repo, path, ref):
-    url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={ref}"
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        return base64.b64decode(r.json().get("content", "")).decode()
+def get_file_content(repo, file_path, ref, token):
+    url = f"https://api.github.com/repos/{repo}/contents/{file_path}?ref={ref}"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        content = response.json().get("content", "")
+        return base64.b64decode(content).decode()
     return None
 
-def post_review_comment(repo, pr_number, path, line, message, commit_id):
+def post_comment(repo, pr_number, path, line, message, commit_id, token):
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/comments"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     payload = {
         "body": message,
         "commit_id": commit_id,
@@ -32,4 +27,6 @@ def post_review_comment(repo, pr_number, path, line, message, commit_id):
         "line": line,
         "side": "RIGHT"
     }
-    return requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code != 201:
+        print(f" Failed to post comment: {response.status_code} - {response.text}")
