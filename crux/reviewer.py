@@ -1,52 +1,50 @@
-from . import github, fab
-from .config import GITHUB_REPO
+from crux import github, fab
 
-def parse_and_comment(repo, pr_number, path, fab_text, head_sha):
+def parse_and_post(repo, pr_number, file_path, fab_text, commit_id, token):
     if "No rule violations found." in fab_text:
-        print(f" No violations in {path}")
+        print(f" No violations in {file_path}")
         return
 
     lines = fab_text.split('\n')
     violation = {}
-
     for line in lines:
         line = line.strip()
         if line.startswith("violation number"):
-            if violation.get("Line Number"):
-                try:
-                    line_no = int(str(violation["Line Number"]).split('-')[0])
-                    message = f"**Rule**: {violation['Rule Name']}\n**Severity**: {violation['Severity']}\n**Explanation**: {violation['Explanation']}\n**Suggested Fix**: {violation['Suggested Fix']}"
-                    github.post_review_comment(repo, pr_number, path, line_no, message, head_sha)
-                except Exception:
-                    pass
-            violation.clear()
+            if violation and "Line Number" in violation:
+                github.post_comment(
+                    repo, pr_number, file_path, violation["Line Number"],
+                    f"**Rule**: {violation['Rule Name']}\n**Severity**: {violation['Severity']}\n**Explanation**: {violation['Explanation']}\n**Suggested Fix**: {violation['Suggested Fix']}",
+                    commit_id, token
+                )
+                violation.clear()
         elif line.startswith("Rule Name:"):
-            violation["Rule Name"] = line.replace("Rule Name:", "").strip()
+            violation["Rule Name"] = line.split(":", 1)[1].strip()
         elif line.startswith("Severity:"):
-            violation["Severity"] = line.replace("Severity:", "").strip()
+            violation["Severity"] = line.split(":", 1)[1].strip()
         elif line.startswith("Line Number:"):
-            violation["Line Number"] = line.replace("Line Number:", "").strip()
+            try:
+                violation["Line Number"] = int(line.split(":", 1)[1].strip())
+            except:
+                violation["Line Number"] = 1
         elif line.startswith("Explanation:"):
-            violation["Explanation"] = line.replace("Explanation:", "").strip()
+            violation["Explanation"] = line.split(":", 1)[1].strip()
         elif line.startswith("Suggested Fix:"):
-            violation["Suggested Fix"] = line.replace("Suggested Fix:", "").strip()
+            violation["Suggested Fix"] = line.split(":", 1)[1].strip()
 
-def review_pr(pr):
-    pr_number = pr['number']
-    pr_title = pr['title']
-    head_sha = pr['head']['sha']
+    if violation and "Line Number" in violation:
+        github.post_comment(
+            repo, pr_number, file_path, violation["Line Number"],
+            f"**Rule**: {violation['Rule Name']}\n**Severity**: {violation['Severity']}\n**Explanation**: {violation['Explanation']}\n**Suggested Fix**: {violation['Suggested Fix']}",
+            commit_id, token
+        )
 
-    print(f"\n Reviewing PR #{pr_number}: {pr_title}")
-    for file in github.get_pr_files(GITHUB_REPO, pr_number):
-        if file['status'] in ['added', 'modified']:
-            path = file['filename']
-            print(f"  Reviewing {path}...")
-            content = github.get_file_content(GITHUB_REPO, path, head_sha)
+def review(repo, pr_number, commit_id, token):
+    files = github.get_pr_files(repo, pr_number, token)
+    for file in files:
+        if file["status"] in ["added", "modified"]:
+            path = file["filename"]
+            print(f" Reviewing {path}")
+            content = github.get_file_content(repo, path, commit_id, token)
             if content:
-                fab_text = fab.send_to_fab(path, content)
-                parse_and_comment(GITHUB_REPO, pr_number, path, fab_text, head_sha)
-
-def review_all_open_pr():
-    prs = github.get_open_prs(GITHUB_REPO)
-    for pr in prs:
-        review_pr(pr)
+                review_text = fab.get_fab_review(path, content)
+                parse_and_post(repo, pr_number, path, review_text, commit_id, token)
