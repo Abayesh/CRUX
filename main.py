@@ -4,6 +4,7 @@ import time
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Header
+from crux.reviewer import review
 
 load_dotenv('credentials.env')
 
@@ -48,9 +49,6 @@ async def handle_webhook(request: Request, x_github_event: str = Header(None)):
 
             print(f"\n PR Event: #{pr_number} in {repo} — {action}")
             token = get_installation_token(installation_id)
-
-            # TODO: Plug in your CRUX logic here
-            # Pass token, repo, pr_number, head_sha to your review logic
-            # e.g., crux.reviewer.review(repo, pr_number, head_sha, token)
+            review(repo,pr_number,head_sha,token)
 
     return {"status": "ok"}
